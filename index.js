@@ -1,32 +1,73 @@
 const fs = require('fs');
-
+const { readdir, stat } = fs.promises;
+const path = require('path');
 const cheerio = require('cheerio');
-const script = `
-<script>
-  function toRoute(route) {
-    console.log('going to:', route);
-  }
-</script>
-`;
 
-fs.readFile('./public/index.html', 'utf8', (err, res) => {
-  if (err) throw err;
+(async () => {
+  const filePaths = await getSrcFileRelativePaths();
+  const htmlFiles = filePaths.filter(filePath => filePath.includes('.html'));
 
-  const $ = cheerio.load('<div class="page"></div>');
+  const processedHtmlFiles = htmlFiles.map(filePath =>
+    processHtmlFile(filePath)
+  );
 
-  $('.page').append(res);
-  $('.page').append(script);
+  const body = processedHtmlFiles.join('');
 
-  $('a').each((i, element) => {
-    const linkUrl = $(element).attr('href');
-    $(element).attr('href', `javascript:void(0)`);
-    $(element).attr('onclick', `toRoute('${linkUrl}')`);
-  });
+  const $ = cheerio.load(body);
+  const spaScript = fs.readFileSync('./spa.js', 'utf8');
+  $('body').append(`<script>${spaScript}</script>`);
+  const site = $.html();
 
-  const page = $('body').html();
-
-  fs.writeFile('./dist/index.html', page, err => {
+  fs.writeFile('./dist/index.html', site, err => {
     if (err) throw err;
     console.log('Saved!');
   });
-});
+})();
+
+function processHtmlFile(filePath) {
+  const prefixedFilePath = './src' + filePath;
+
+  const sourceHtml = fs.readFileSync(prefixedFilePath, 'utf8');
+
+  const $ = cheerio.load(
+    `<div data-route="${filePath}" class="page" hidden></div>`
+  );
+  $('.page').append(sourceHtml);
+
+  $('a').each((_, element) => {
+    const linkUrl = $(element).attr('href');
+    $(element).attr('href', `javascript:void(0)`);
+    $(element).attr('data-href', linkUrl);
+    $(element).attr('onclick', 'SPA.followLink(this)');
+  });
+
+  return $('body').html();
+}
+
+async function getSrcFileRelativePaths() {
+  const srcFileAbsolutePaths = await getAbsoluteFilePathsInDirectory('./src');
+  const srcDirectoryDepth = __dirname.split(path.sep).length + 1;
+
+  const srcFileRelativePaths = srcFileAbsolutePaths.map(
+    file =>
+      '/' +
+      file
+        .split(path.sep)
+        .slice(srcDirectoryDepth)
+        .join('/')
+  );
+  return srcFileRelativePaths;
+}
+
+async function getAbsoluteFilePathsInDirectory(dir) {
+  const subdirs = await readdir(dir);
+  const files = await Promise.all(
+    subdirs.map(async subdir => {
+      const res = path.resolve(dir, subdir);
+      return (await stat(res)).isDirectory()
+        ? getAbsoluteFilePathsInDirectory(res)
+        : res;
+    })
+  );
+  return Array.prototype.concat(...files);
+}
