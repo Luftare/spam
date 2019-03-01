@@ -20,7 +20,7 @@ const cheerio = require('cheerio');
 
   fs.writeFile('./dist/index.html', site, err => {
     if (err) throw err;
-    console.log('Saved!');
+    console.log('Built successfully!');
   });
 })();
 
@@ -29,10 +29,15 @@ function processHtmlFile(filePath) {
 
   const sourceHtml = fs.readFileSync(prefixedFilePath, 'utf8');
 
+  scriptProcessedSource = sourceHtml.replace(/{{([^}}]+)}}/g, (_, fn) => {
+    return `<script>(${fn})()</script>`;
+  });
+
   const $ = cheerio.load(
     `<div data-route="${filePath}" class="page" hidden></div>`
   );
-  $('.page').append(sourceHtml);
+
+  $('.page').append(scriptProcessedSource);
 
   $('a').each((_, element) => {
     const linkUrl = $(element).attr('href');
@@ -41,7 +46,11 @@ function processHtmlFile(filePath) {
     $(element).attr('onclick', 'SPA.followLink(this)');
   });
 
-  return $('body').html();
+  return $('body')
+    .html()
+    .replace(/{{([^}}]+)}}/g, () => {
+      return '';
+    });
 }
 
 async function getSrcFileRelativePaths() {
