@@ -1,20 +1,37 @@
 const SPA = {
   pages: [],
   scopedPageScripts: {},
+  pageTemplates: {},
   state: {},
   init() {
+    doT.templateSettings.varname = 'state';
     this.pages = [...document.querySelectorAll('.page')];
-    const route = document.location.pathname;
+    const rawRoute = document.location.pathname;
+    const route = this.getRouteFileName(rawRoute);
     this.handleNewRoute(route);
 
     window.onpopstate = ({ state }) => {
-      this.handleNewRoute(state.route);
+      const route = this.getRouteFileName(state.route);
+      this.handleNewRoute(route);
     };
   },
+  initState(state) {
+    const stateChangeHandler = {
+      set: (target, key, value) => {
+        target[key] = value;
+        const rawRoute = document.location.pathname;
+        const route = this.getRouteFileName(rawRoute);
+        this.renderPageTemplate(route);
+      }
+    };
+
+    this.state = new Proxy(state, stateChangeHandler);
+  },
   followLink(linkElement) {
-    const route = linkElement.getAttribute('data-href');
+    const rawRoute = linkElement.getAttribute('data-href');
+    const route = this.getRouteFileName(rawRoute);
     this.handleNewRoute(route);
-    history.pushState({ route }, '', route);
+    history.pushState({ route: rawRoute }, '', rawRoute);
   },
   showPage(pageToShow) {
     this.pages.forEach(page => {
@@ -24,17 +41,22 @@ const SPA = {
   handleNewRoute(route) {
     const page = this.getRequestedPageElement(route);
     this.requestScopedPageScript(route);
+    this.renderPageTemplate(route);
     this.showPage(page);
   },
-  requestScopedPageScript(rawRoute) {
-    const route = this.getRouteFileName(rawRoute);
+  renderPageTemplate(route) {
+    const page = this.getRequestedPageElement(route);
+    const pageTemplate = this.pageTemplates[route];
+    const html = doT.template(pageTemplate)(this.state);
+    page.innerHTML = html;
+  },
+  requestScopedPageScript(route) {
     const pageScript = this.scopedPageScripts[route];
     if (pageScript) {
       pageScript(this.state);
     }
   },
-  getRequestedPageElement(rawRoute) {
-    const route = this.getRouteFileName(rawRoute);
+  getRequestedPageElement(route) {
     return this.pages.find(page => page.getAttribute('data-route') === route);
   },
   getRouteFileName(rawRouteName) {

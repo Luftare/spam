@@ -1,6 +1,12 @@
-<h1>Hello!</h1>
+<h1 id="hello">{{ =state.msg }}</h1>
 <a href="/about">about</a>
 <a href="/news/old/something">Old news</a>
 <script scoped>
-  console.log('loading index!', state);
+  console.log('entered home page');
+</script>
+<script>
+  SPA.initState({
+    msg: 'moikka!',
+    count: 5
+  });
 </script>

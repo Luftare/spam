@@ -1,2 +1,15 @@
-<h1>About</h1>
+<h1>About {{=state.count}}</h1>
+<button onclick="increment()">increment</button>
 <a href="/">home</a>
+<script scoped>
+  function increment() {
+    console.log(SPA.state);
+  }
+  console.log('entered about');
+  SPA.state.count++;
+</script>
+<script>
+  function increment() {
+    SPA.state.count++;
+  }
+</script>

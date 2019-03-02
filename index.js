@@ -15,8 +15,9 @@ const buildStartTime = Date.now();
   const body = processedHtmlFiles.join('');
 
   const $ = cheerio.load(body);
+  const doTScript = fs.readFileSync('./node_modules/dot/doT.min.js', 'utf8');
   const spaScript = fs.readFileSync('./spa.js', 'utf8');
-  $('body').prepend(`<script>${spaScript}</script>`);
+  $('body').prepend(`<script>${doTScript}${spaScript}</script>`);
   const site = $.html();
 
   fs.writeFile('./dist/index.html', site, err => {
@@ -44,15 +45,29 @@ function processHtmlFile(filePath) {
     $(element).attr('onclick', 'SPA.followLink(this)');
   });
 
-  $('script').each((_, element) => {
-    const attr = $(element).attr('scoped');
-    if (typeof attr !== typeof undefined && attr !== false) {
-      const scriptContent = $(element).html();
+  const pageHasScopedScript = $('script[scoped]').length === 1;
 
-      $(element).html(
-        `SPA.scopedPageScripts['${filePath}'] = (state) => {${scriptContent}};`
-      );
-    }
+  if (!pageHasScopedScript) {
+    $('.page').append('<script scoped></script>');
+  }
+
+  const pageTemplate = cheerio.load($('.page').html());
+  pageTemplate('script').remove();
+
+  $('script[scoped]').each((_, element) => {
+    const scriptContent = $(element).html();
+
+    $(element).html(
+      `SPA.scopedPageScripts['${filePath}'] = (state) => {${scriptContent}};
+        SPA.pageTemplates['${filePath}'] = '${pageTemplate('body')
+        .html()
+        .split('\n')
+        .join('')
+        .replace(/\{{.*?\}}/, expression => {
+          const expressionWithoutSpaces = expression.split(' ').join('');
+          return expressionWithoutSpaces;
+        })}';`
+    );
   });
 
   return $('body').html();

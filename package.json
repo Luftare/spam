@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "onchange */** * -e dist -- node index.js",
+    "watch": "onchange */** * -e dist node_modules/** -- node index.js",
     "dev": "concurrently --kill-others \"npm run watch\" \"npm run serve\"",
     "serve": "node dev-server.js"
   },
@@ -13,7 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cheerio": "^1.0.0-rc.2"
+    "cheerio": "^1.0.0-rc.2",
+    "dot": "^1.1.2"
   },
   "devDependencies": {
     "concurrently": "^4.1.0",
