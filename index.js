@@ -51,6 +51,13 @@ function processHtmlFile(filePath) {
     $('.page').append('<script scoped></script>');
   }
 
+  $('script[src]').each((i, element) => {
+    const scriptPath = `./src/${$(element).attr('src')}`;
+    const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+    $(element).remove();
+    $('.page').append(`<script>${scriptSource}</script>`);
+  });
+
   const pageTemplate = cheerio.load($('.page').html());
   pageTemplate('script').remove();
 
