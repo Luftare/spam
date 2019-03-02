@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "onchange -i -k 'src/**/*' -- node .",
+    "watch": "onchange */** * -e dist -- node index.js",
     "dev": "concurrently --kill-others \"npm run watch\" \"npm run serve\"",
     "serve": "node dev-server.js"
   },
