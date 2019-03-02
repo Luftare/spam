@@ -30,7 +30,7 @@ function processHtmlFile(filePath) {
   const sourceHtml = fs.readFileSync(prefixedFilePath, 'utf8');
 
   scriptProcessedSource = sourceHtml.replace(/{{([^}}]+)}}/g, (_, fn) => {
-    return `<script>(${fn})()</script>`;
+    return `<script>console.log((${fn})());</script>`;
   });
 
   const $ = cheerio.load(
