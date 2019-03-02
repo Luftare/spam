@@ -2,6 +2,7 @@ const fs = require('fs');
 const { readdir, stat } = fs.promises;
 const path = require('path');
 const cheerio = require('cheerio');
+const buildStartTime = Date.now();
 
 (async () => {
   const filePaths = await getSrcFileRelativePaths();
@@ -15,12 +16,13 @@ const cheerio = require('cheerio');
 
   const $ = cheerio.load(body);
   const spaScript = fs.readFileSync('./spa.js', 'utf8');
-  $('body').append(`<script>${spaScript}</script>`);
+  $('body').prepend(`<script>${spaScript}</script>`);
   const site = $.html();
 
   fs.writeFile('./dist/index.html', site, err => {
     if (err) throw err;
-    console.log('Built successfully!');
+    const buildTime = Date.now() - buildStartTime;
+    console.log(`Built successfully in ${buildTime} ms`);
   });
 })();
 
@@ -29,15 +31,11 @@ function processHtmlFile(filePath) {
 
   const sourceHtml = fs.readFileSync(prefixedFilePath, 'utf8');
 
-  scriptProcessedSource = sourceHtml.replace(/{{([^}}]+)}}/g, (_, fn) => {
-    return `<script>console.log((${fn})());</script>`;
-  });
-
   const $ = cheerio.load(
     `<div data-route="${filePath}" class="page" hidden></div>`
   );
 
-  $('.page').append(scriptProcessedSource);
+  $('.page').append(sourceHtml);
 
   $('a').each((_, element) => {
     const linkUrl = $(element).attr('href');
@@ -46,11 +44,18 @@ function processHtmlFile(filePath) {
     $(element).attr('onclick', 'SPA.followLink(this)');
   });
 
-  return $('body')
-    .html()
-    .replace(/{{([^}}]+)}}/g, () => {
-      return '';
-    });
+  $('script').each((_, element) => {
+    const attr = $(element).attr('scoped');
+    if (typeof attr !== typeof undefined && attr !== false) {
+      const scriptContent = $(element).html();
+
+      $(element).html(
+        `SPA.scopedPageScripts['${filePath}'] = (state) => {${scriptContent}};`
+      );
+    }
+  });
+
+  return $('body').html();
 }
 
 async function getSrcFileRelativePaths() {

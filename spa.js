@@ -1,5 +1,7 @@
 const SPA = {
   pages: [],
+  scopedPageScripts: {},
+  state: {},
   init() {
     this.pages = [...document.querySelectorAll('.page')];
     const route = document.location.pathname;
@@ -21,27 +23,36 @@ const SPA = {
   },
   handleNewRoute(route) {
     const page = this.getRequestedPageElement(route);
+    this.requestScopedPageScript(route);
     this.showPage(page);
   },
-  getRequestedPageElement(route) {
-    if (route === '/') {
-      return this.pages.find(
-        page => page.getAttribute('data-route') === '/index.html'
-      );
+  requestScopedPageScript(rawRoute) {
+    const route = this.getRouteFileName(rawRoute);
+    const pageScript = this.scopedPageScripts[route];
+    if (pageScript) {
+      pageScript(this.state);
     }
+  },
+  getRequestedPageElement(rawRoute) {
+    const route = this.getRouteFileName(rawRoute);
+    return this.pages.find(page => page.getAttribute('data-route') === route);
+  },
+  getRouteFileName(rawRouteName) {
+    if (rawRouteName === '/') return '/index.html';
 
-    const extendedPageName = route + '.html';
-    const namedFileMatch = this.pages.find(
-      page => page.getAttribute('data-route') === extendedPageName
+    const explicitRouteName = rawRouteName + '.html';
+    const explicitRouteNameCandidate = this.pages.find(
+      page => page.getAttribute('data-route') === explicitRouteName
     );
 
-    if (namedFileMatch) return namedFileMatch;
+    if (explicitRouteNameCandidate) return explicitRouteName;
 
-    const indexExtendedPageName = route + '/index.html';
-    return this.pages.find(
-      page => page.getAttribute('data-route') === indexExtendedPageName
+    const implicitRouteName = rawRouteName + '/index.html';
+    const implicitRouteNameCandidate = this.pages.find(
+      page => page.getAttribute('data-route') === implicitRouteName
     );
+    if (implicitRouteNameCandidate) implicitRouteName;
   }
 };
 
-SPA.init();
+window.onload = SPA.init.bind(SPA);
