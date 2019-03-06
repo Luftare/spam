@@ -10,6 +10,10 @@ const SPA = {
     const route = this.getRouteFileName(rawRoute);
     this.handleNewRoute(route);
 
+    if (history.state === null) {
+      history.replaceState({ route: rawRoute }, '');
+    }
+
     window.onpopstate = ({ state }) => {
       const route = this.getRouteFileName(state.route);
       this.handleNewRoute(route);
