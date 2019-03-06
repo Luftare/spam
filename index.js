@@ -4,20 +4,24 @@ const path = require('path');
 const cheerio = require('cheerio');
 const buildStartTime = Date.now();
 
+let scriptBundle = '';
+const doTScript = fs.readFileSync('./node_modules/dot/doT.min.js', 'utf8');
+const spaScript = fs.readFileSync('./spa.js', 'utf8');
+scriptBundle += doTScript + spaScript;
+
 (async () => {
   const filePaths = await getSrcFileRelativePaths();
   const htmlFiles = filePaths.filter(filePath => filePath.includes('.html'));
 
-  const processedHtmlFiles = htmlFiles.map(filePath =>
-    processHtmlFile(filePath)
+  const processedHtmlFiles = htmlFiles.map((filePath, index) =>
+    processHtmlFile(filePath, index)
   );
 
   const body = processedHtmlFiles.join('');
 
   const $ = cheerio.load(body);
-  const doTScript = fs.readFileSync('./node_modules/dot/doT.min.js', 'utf8');
-  const spaScript = fs.readFileSync('./spa.js', 'utf8');
-  $('body').prepend(`<script>${doTScript}${spaScript}</script>`);
+
+  $('body').prepend(`<script>${scriptBundle}</script>`);
   const site = $.html();
 
   fs.writeFile('./dist/index.html', site, err => {
@@ -27,16 +31,18 @@ const buildStartTime = Date.now();
   });
 })();
 
-function processHtmlFile(filePath) {
+function processHtmlFile(filePath, index) {
   const prefixedFilePath = './src' + filePath;
 
   const sourceHtml = fs.readFileSync(prefixedFilePath, 'utf8');
+
+  const scopeHashedSource = sourceHtml.replace(/__local/g, '__local' + index);
 
   const $ = cheerio.load(
     `<div data-route="${filePath}" class="page" hidden></div>`
   );
 
-  $('.page').append(sourceHtml);
+  $('.page').append(scopeHashedSource);
 
   $('a').each((_, element) => {
     const linkUrl = $(element).attr('href');
@@ -51,33 +57,50 @@ function processHtmlFile(filePath) {
     $('.page').append('<script scoped></script>');
   }
 
-  $('script[src]').each((i, element) => {
-    const scriptPath = `./src/${$(element).attr('src')}`;
-    const scriptSource = fs.readFileSync(scriptPath, 'utf8');
+  $('script').each((i, element) => {
+    const isScopedScript = !!$(element).attr('scoped');
+    const hasSourceAttribute = !!$(element).attr('src');
+
+    if (isScopedScript) {
+      processScopedScript($, element, filePath);
+    } else if (hasSourceAttribute) {
+      processScriptWithSourceAttribute($, element, filePath);
+    } else {
+      scriptBundle += $(element).html();
+    }
     $(element).remove();
-    $('.page').append(`<script>${scriptSource}</script>`);
   });
+
+  return $('body').html();
+}
+
+function processScopedScript($, element, filePath) {
+  const scriptContent = $(element).html();
+  $(element).remove();
 
   const pageTemplate = cheerio.load($('.page').html());
   pageTemplate('script').remove();
 
-  $('script[scoped]').each((_, element) => {
-    const scriptContent = $(element).html();
+  const templateString = pageTemplate('body')
+    .html()
+    .split('\n')
+    .join('')
+    .replace(/\{{.*?\}}/, expression => {
+      const expressionWithoutSpaces = expression.split(' ').join('');
+      return expressionWithoutSpaces;
+    });
 
-    $(element).html(
-      `SPA.scopedPageScripts['${filePath}'] = (state) => {${scriptContent}};
-        SPA.pageTemplates['${filePath}'] = '${pageTemplate('body')
-        .html()
-        .split('\n')
-        .join('')
-        .replace(/\{{.*?\}}/, expression => {
-          const expressionWithoutSpaces = expression.split(' ').join('');
-          return expressionWithoutSpaces;
-        })}';`
-    );
-  });
+  const processedScriptContent = `SPA.scopedPageScripts['${filePath}'] = (state) => {${scriptContent}};
+    SPA.pageTemplates['${filePath}'] ='${templateString}';`;
 
-  return $('body').html();
+  scriptBundle += processedScriptContent;
+}
+
+function processScriptWithSourceAttribute($, element) {
+  const scriptPath = `./src/${$(element).attr('src')}`;
+  const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+  $(element).remove();
+  scriptBundle += scriptContent;
 }
 
 async function getSrcFileRelativePaths() {

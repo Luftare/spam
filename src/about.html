@@ -1,13 +1,9 @@
 <h1>About {{=state.count}}</h1>
-<button onclick="about.increment()">+</button>
-<button onclick="about.decrement()">-</button>
+<button onclick="__local.increment()">+</button>
+<button onclick="__local.decrement()">-</button>
 <a href="/">home</a>
-<script scoped>
-  console.log('entered about');
-  SPA.state.count++;
-</script>
 <script>
-  const about = {
+  const __local = {
     increment() {
       SPA.state.count++;
     },
@@ -16,5 +12,5 @@
     }
   };
 
-  setInterval(about.increment, 1000);
+  setInterval(__local.increment, 1000);
 </script>
